@@ -57,6 +57,7 @@ struct ScanView: View {
                 }
                 .foregroundStyle(.white)
                 .padding(.bottom, 30)
+                .accessibilityIdentifier("manual-entry-button")
             }
         }
         .onAppear { viewModel.setupCamera() }
