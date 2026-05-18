@@ -8,6 +8,7 @@ struct ReceiptDetailView: View {
     @State private var showDeleteAlert = false
     @State private var showEdit = false
     @State private var showSavedToast = false
+    @State private var showFullImage = false
 
     var body: some View {
         ScrollView {
@@ -17,12 +18,25 @@ struct ReceiptDetailView: View {
                         .resizable()
                         .scaledToFit()
                         .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .onTapGesture { showFullImage = true }
+                        .overlay(alignment: .bottomTrailing) {
+                            Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                .font(.caption)
+                                .padding(4)
+                                .background(.black.opacity(0.4))
+                                .foregroundStyle(.white)
+                                .clipShape(Circle())
+                                .padding(4)
+                        }
                 }
                 VStack(alignment: .leading, spacing: 12) {
                     DetailRow(label: "お店", value: receipt.storeName)
                     DetailRow(label: "日付", value: receipt.date.shortDateString)
                     DetailRow(label: "金額", value: "¥\(receipt.totalAmount.formatted())")
                     DetailRow(label: "カテゴリ", value: receipt.category)
+                    if !receipt.notes.isEmpty {
+                        DetailRow(label: "メモ", value: receipt.notes)
+                    }
                 }
                 .padding()
                 .background(Color.receiptCard)
@@ -35,11 +49,14 @@ struct ReceiptDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Menu {
+                HStack {
                     Button("編集") { showEdit = true }
-                    Button("削除", role: .destructive) { showDeleteAlert = true }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
+                    Menu {
+                        Button("削除", role: .destructive) { showDeleteAlert = true }
+                    } label: {
+                        Image(systemName: "trash")
+                            .foregroundStyle(.red)
+                    }
                 }
             }
         }
@@ -64,11 +81,13 @@ struct ReceiptDetailView: View {
                     rawText: ""
                 ),
                 capturedImage: receipt.imageData.flatMap { UIImage(data: $0) },
+                initialNotes: receipt.notes,
                 onSave: { updated in
                     receipt.storeName = updated.storeName
                     receipt.totalAmount = updated.totalAmount
                     receipt.category = updated.category
                     receipt.date = updated.date
+                    receipt.notes = updated.notes
                     showEdit = false
                     // シート閉じアニメーション完了後にトーストを出す
                     Task {
@@ -77,6 +96,22 @@ struct ReceiptDetailView: View {
                     }
                 }
             )
+        }
+        .fullScreenCover(isPresented: $showFullImage) {
+            if let data = receipt.imageData, let image = UIImage(data: data) {
+                ZStack(alignment: .topTrailing) {
+                    Color.black.ignoresSafeArea()
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFit()
+                    Button(action: { showFullImage = false }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title)
+                            .foregroundStyle(.white)
+                            .padding()
+                    }
+                }
+            }
         }
         .toast(isPresented: $showSavedToast, message: "✓ 保存しました")
     }

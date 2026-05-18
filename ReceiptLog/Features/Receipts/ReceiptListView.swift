@@ -9,6 +9,8 @@ struct ReceiptListView: View {
     @State private var currentMonth: Date = Date()
     @State private var receiptToDelete: Receipt?
     @State private var searchText: String = ""
+    @State private var showToast = false
+    @State private var toastMessage = ""
 
     private var isSearching: Bool {
         !searchText.trimmingCharacters(in: .whitespaces).isEmpty
@@ -48,13 +50,17 @@ struct ReceiptListView: View {
                         }
                         .accessibilityLabel("前の月")
                         Spacer()
-                        VStack {
-                            Text(currentMonth.monthYearString)
-                                .font(.headline)
-                            Text("¥\(monthTotal.formatted())")
-                                .font(.subheadline)
-                                .foregroundStyle(Color.receiptAccent)
+                        Button(action: { currentMonth = Date() }) {
+                            VStack {
+                                Text(currentMonth.monthYearString)
+                                    .font(.headline)
+                                    .foregroundStyle(Color.receiptText)
+                                Text("¥\(monthTotal.formatted())")
+                                    .font(.subheadline)
+                                    .foregroundStyle(Color.receiptAccent)
+                            }
                         }
+                        .disabled(Calendar.current.isDate(currentMonth, equalTo: Date(), toGranularity: .month))
                         Spacer()
                         Button { changeMonth(by: 1) } label: {
                             Image(systemName: "chevron.right")
@@ -127,6 +133,8 @@ struct ReceiptListView: View {
                 Button("削除", role: .destructive) {
                     if let receipt = receiptToDelete {
                         modelContext.delete(receipt)
+                        toastMessage = "削除しました"
+                        showToast = true
                     }
                     receiptToDelete = nil
                 }
@@ -136,6 +144,7 @@ struct ReceiptListView: View {
             } message: {
                 Text("この操作は元に戻せません")
             }
+            .toast(isPresented: $showToast, message: toastMessage)
         }
     }
 
