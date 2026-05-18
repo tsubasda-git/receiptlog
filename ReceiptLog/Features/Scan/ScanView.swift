@@ -9,6 +9,7 @@ struct ScanView: View {
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var showToast = false
     @State private var toastMessage = ""
+    @State private var cameraPermissionDenied = false
     @Environment(\.modelContext) private var modelContext
     @AppStorage("scanSaveCount") private var scanSaveCount = 0
 
@@ -46,8 +47,8 @@ struct ScanView: View {
                             .overlay(Circle().stroke(Color.receiptAccent, lineWidth: 3).padding(4))
                     }
 
-                    Button(action: {}) {
-                        Image(systemName: "bolt.fill")
+                    Button(action: { viewModel.toggleTorch() }) {
+                        Image(systemName: viewModel.isTorchOn ? "bolt.fill" : "bolt.slash.fill")
                             .font(.title)
                             .foregroundStyle(.white)
                     }
@@ -62,7 +63,13 @@ struct ScanView: View {
                 .accessibilityIdentifier("manual-entry-button")
             }
         }
-        .onAppear { viewModel.setupCamera() }
+        .onAppear {
+            checkCameraPermission()
+            viewModel.setupCamera()
+        }
+        .onDisappear {
+            viewModel.stopCamera()
+        }
         .onChange(of: selectedPhoto) { _, item in
             Task {
                 if let data = try? await item?.loadTransferable(type: Data.self),
@@ -87,14 +94,31 @@ struct ScanView: View {
                 )
             }
         }
+        .alert("カメラのアクセスが必要です", isPresented: $cameraPermissionDenied) {
+            Button("設定を開く") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            }
+            Button("キャンセル", role: .cancel) {}
+        } message: {
+            Text("レシートを撮影するにはカメラへのアクセスを許可してください。設定アプリから変更できます。")
+        }
         .toast(isPresented: $showToast, message: toastMessage)
+    }
+
+    private func checkCameraPermission() {
+        let status = AVCaptureDevice.authorizationStatus(for: .video)
+        if status == .denied || status == .restricted {
+            cameraPermissionDenied = true
+        }
     }
 
     private func requestReviewIfNeeded() {
         guard scanSaveCount == 3 else { return }
         guard let scene = UIApplication.shared.connectedScenes
             .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene else { return }
-        SKStoreReviewController.requestReview(in: scene)
+        AppStore.requestReview(in: scene)
     }
 }
 

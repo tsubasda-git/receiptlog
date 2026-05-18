@@ -7,6 +7,7 @@ struct ReceiptDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showDeleteAlert = false
     @State private var showEdit = false
+    @State private var showSavedToast = false
 
     var body: some View {
         ScrollView {
@@ -62,9 +63,11 @@ struct ReceiptDetailView: View {
                     receipt.category = updated.category
                     receipt.date = updated.date
                     showEdit = false
+                    showSavedToast = true
                 }
             )
         }
+        .toast(isPresented: $showSavedToast, message: "✓ 保存しました")
     }
 }
 

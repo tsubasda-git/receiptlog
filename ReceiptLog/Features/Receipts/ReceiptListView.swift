@@ -2,10 +2,12 @@ import SwiftUI
 import SwiftData
 
 struct ReceiptListView: View {
+    let switchToScan: () -> Void
+
     @Query(sort: \Receipt.date, order: .reverse) private var allReceipts: [Receipt]
     @Environment(\.modelContext) private var modelContext
     @State private var currentMonth: Date = Date()
-    @State private var selectedReceipt: Receipt?
+    @State private var receiptToDelete: Receipt?
 
     private var monthReceipts: [Receipt] {
         allReceipts.filter { $0.date.isSameMonth(as: currentMonth) }
@@ -47,12 +49,20 @@ struct ReceiptListView: View {
                 .background(Color.receiptCard)
 
                 if monthReceipts.isEmpty {
-                    VStack(spacing: 16) {
+                    VStack(spacing: 20) {
                         Image(systemName: "doc.text")
                             .font(.system(size: 48))
                             .foregroundStyle(Color.receiptSubtext)
                         Text("まだレシートがありません")
                             .foregroundStyle(Color.receiptSubtext)
+                        Button(action: switchToScan) {
+                            Label("レシートをスキャン", systemImage: "camera.fill")
+                                .font(.subheadline.bold())
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 10)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(Color.receiptAccent)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(Color.receiptBackground)
@@ -66,7 +76,7 @@ struct ReceiptListView: View {
                                     }
                                     .swipeActions(edge: .trailing) {
                                         Button("削除", role: .destructive) {
-                                            modelContext.delete(receipt)
+                                            receiptToDelete = receipt
                                         }
                                     }
                                 }
@@ -80,6 +90,22 @@ struct ReceiptListView: View {
             }
             .navigationTitle("レシート")
             .background(Color.receiptBackground)
+            .alert("削除しますか？", isPresented: Binding(
+                get: { receiptToDelete != nil },
+                set: { if !$0 { receiptToDelete = nil } }
+            )) {
+                Button("削除", role: .destructive) {
+                    if let receipt = receiptToDelete {
+                        modelContext.delete(receipt)
+                    }
+                    receiptToDelete = nil
+                }
+                Button("キャンセル", role: .cancel) {
+                    receiptToDelete = nil
+                }
+            } message: {
+                Text("この操作は元に戻せません")
+            }
         }
     }
 

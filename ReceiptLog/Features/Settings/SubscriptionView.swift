@@ -4,7 +4,9 @@ import StoreKit
 struct SubscriptionView: View {
     @Environment(StoreKitService.self) private var storeKit
     @Environment(\.dismiss) private var dismiss
-    @State private var showToast = false
+    @State private var showPurchaseToast = false
+    @State private var showRestoreToast = false
+    @State private var restoreMessage = ""
 
     var body: some View {
         NavigationStack {
@@ -21,14 +23,33 @@ struct SubscriptionView: View {
                             .foregroundStyle(Color.receiptSubtext)
                     }
 
-                    HStack(spacing: 12) {
-                        ForEach(storeKit.products, id: \.id) { product in
-                            PlanCard(product: product) {
-                                Task {
-                                    try? await storeKit.purchase(product)
-                                    if storeKit.isPremium {
-                                        showToast = true
-                                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { dismiss() }
+                    if storeKit.isLoading && storeKit.products.isEmpty {
+                        ProgressView()
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                    } else if let error = storeKit.loadError {
+                        Text(error)
+                            .foregroundStyle(.red)
+                            .font(.caption)
+                            .multilineTextAlignment(.center)
+                    } else if storeKit.products.isEmpty {
+                        Text("商品情報を読み込んでいます...")
+                            .foregroundStyle(Color.receiptSubtext)
+                            .font(.caption)
+                    } else {
+                        HStack(spacing: 12) {
+                            ForEach(storeKit.products, id: \.id) { product in
+                                PlanCard(product: product, isDisabled: storeKit.isLoading) {
+                                    Task {
+                                        do {
+                                            try await storeKit.purchase(product)
+                                            if storeKit.isPremium {
+                                                showPurchaseToast = true
+                                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { dismiss() }
+                                            }
+                                        } catch {
+                                            // userCancelled は無視、その他は将来的にアラート表示
+                                        }
                                     }
                                 }
                             }
@@ -43,8 +64,19 @@ struct SubscriptionView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                     Button("購入を復元") {
-                        Task { try? await storeKit.restorePurchases() }
+                        Task {
+                            do {
+                                try await storeKit.restorePurchases()
+                                restoreMessage = storeKit.isPremium
+                                    ? "✓ 復元しました"
+                                    : "復元できる購入が見つかりませんでした"
+                            } catch {
+                                restoreMessage = "復元に失敗しました"
+                            }
+                            showRestoreToast = true
+                        }
                     }
+                    .disabled(storeKit.isLoading)
                     .font(.footnote)
                     .foregroundStyle(Color.receiptSubtext)
 
@@ -64,15 +96,18 @@ struct SubscriptionView: View {
                 }
             }
             .task { await storeKit.loadProducts() }
-            .toast(isPresented: $showToast, message: "🎉 プレミアムへようこそ！")
+            .toast(isPresented: $showPurchaseToast, message: "🎉 プレミアムへようこそ！")
+            .toast(isPresented: $showRestoreToast, message: restoreMessage)
         }
     }
 }
 
 struct PlanCard: View {
     let product: Product
+    let isDisabled: Bool
     let onPurchase: () -> Void
     var isRecommended: Bool { product.id.contains("yearly") }
+    var periodText: String { isRecommended ? "毎年自動更新" : "毎月自動更新" }
 
     var body: some View {
         VStack(spacing: 12) {
@@ -85,9 +120,20 @@ struct PlanCard: View {
             }
             Text(isRecommended ? "年額" : "月額").font(.caption).foregroundStyle(Color.receiptSubtext)
             Text(product.displayPrice).font(.title3.bold())
-            Button("購入", action: onPurchase)
-                .buttonStyle(.borderedProminent)
-                .tint(Color.receiptAccent)
+            Text(periodText).font(.caption2).foregroundStyle(Color.receiptSubtext)
+            Button(action: onPurchase) {
+                if isDisabled {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 4)
+                } else {
+                    Text("購入")
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(Color.receiptAccent)
+            .disabled(isDisabled)
         }
         .padding()
         .frame(maxWidth: .infinity)
