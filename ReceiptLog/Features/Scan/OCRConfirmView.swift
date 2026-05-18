@@ -44,6 +44,7 @@ struct OCRConfirmView: View {
                                 Text("¥")
                                 TextField("0", text: $totalAmount)
                                     .keyboardType(.numberPad)
+                                    .accessibilityIdentifier("amount-field")
                             }
                         }
 
@@ -116,6 +117,7 @@ struct FormField: View {
             Text(title).foregroundStyle(.secondary)
             TextField(placeholder, text: $text)
                 .textFieldStyle(.roundedBorder)
+                .accessibilityIdentifier(placeholder)
         }
     }
 }

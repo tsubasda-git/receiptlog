@@ -13,8 +13,8 @@ final class StoreKitService {
     var products: [Product] = []
     var isLoading: Bool = false
 
-    static let monthlyProductID = "com.yourname.receiptlog.premium.monthly"
-    static let yearlyProductID  = "com.yourname.receiptlog.premium.yearly"
+    static let monthlyProductID = "com.kbytsubasa.ReceiptLog.premium.monthly"
+    static let yearlyProductID  = "com.kbytsubasa.ReceiptLog.premium.yearly"
 
     func loadProducts() async {
         do {

@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import StoreKit
 import AVFoundation
 import PhotosUI
 
@@ -9,6 +10,7 @@ struct ScanView: View {
     @State private var showToast = false
     @State private var toastMessage = ""
     @Environment(\.modelContext) private var modelContext
+    @AppStorage("scanSaveCount") private var scanSaveCount = 0
 
     var body: some View {
         ZStack {
@@ -76,6 +78,8 @@ struct ScanView: View {
                     capturedImage: viewModel.capturedImage,
                     onSave: { receipt in
                         modelContext.insert(receipt)
+                        scanSaveCount += 1
+                        requestReviewIfNeeded()
                         toastMessage = "✓ 保存しました"
                         showToast = true
                         viewModel.showOCRConfirm = false
@@ -84,6 +88,13 @@ struct ScanView: View {
             }
         }
         .toast(isPresented: $showToast, message: toastMessage)
+    }
+
+    private func requestReviewIfNeeded() {
+        guard scanSaveCount == 3 else { return }
+        guard let scene = UIApplication.shared.connectedScenes
+            .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene else { return }
+        SKStoreReviewController.requestReview(in: scene)
     }
 }
 
