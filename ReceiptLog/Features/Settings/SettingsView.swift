@@ -34,8 +34,8 @@ struct SettingsView: View {
                 }
 
                 Section("サポート") {
-                    Link("プライバシーポリシー", destination: URL(string: "https://example.com/privacy")!)
-                    Link("利用規約", destination: URL(string: "https://example.com/terms")!)
+                    Link("プライバシーポリシー", destination: URL(string: "https://tsubasda-git.github.io/receiptlog/privacy.html")!)
+                    Link("利用規約", destination: URL(string: "https://tsubasda-git.github.io/receiptlog/privacy.html")!)
                     Button("購入を復元") {
                         Task { try? await storeKit.restorePurchases() }
                     }
