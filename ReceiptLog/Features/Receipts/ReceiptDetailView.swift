@@ -35,18 +35,25 @@ struct ReceiptDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button("編集") { showEdit = true }
-            }
-            ToolbarItem(placement: .destructiveAction) {
-                Button("削除", role: .destructive) { showDeleteAlert = true }
+                Menu {
+                    Button("編集") { showEdit = true }
+                    Button("削除", role: .destructive) { showDeleteAlert = true }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
             }
         }
         .alert("削除しますか？", isPresented: $showDeleteAlert) {
             Button("削除", role: .destructive) {
-                modelContext.delete(receipt)
+                // dismiss先にしてからdelete（dismiss後にreceiptを参照するとクラッシュ）
                 dismiss()
+                Task { @MainActor in
+                    modelContext.delete(receipt)
+                }
             }
             Button("キャンセル", role: .cancel) {}
+        } message: {
+            Text("この操作は元に戻せません")
         }
         .sheet(isPresented: $showEdit) {
             OCRConfirmView(
@@ -63,7 +70,11 @@ struct ReceiptDetailView: View {
                     receipt.category = updated.category
                     receipt.date = updated.date
                     showEdit = false
-                    showSavedToast = true
+                    // シート閉じアニメーション完了後にトーストを出す
+                    Task {
+                        try? await Task.sleep(for: .milliseconds(400))
+                        showSavedToast = true
+                    }
                 }
             )
         }

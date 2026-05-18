@@ -13,12 +13,10 @@ struct DashboardView: View {
 
     private var monthTotal: Int { monthReceipts.reduce(0) { $0 + $1.totalAmount } }
 
-    private var prevMonthReceipts: [Receipt] {
-        let prev = Calendar.current.date(byAdding: .month, value: -1, to: currentMonth)!
-        return allReceipts.filter { $0.date.isSameMonth(as: prev) }
+    private var prevMonthTotal: Int {
+        guard let prev = Calendar.current.date(byAdding: .month, value: -1, to: currentMonth) else { return 0 }
+        return allReceipts.filter { $0.date.isSameMonth(as: prev) }.reduce(0) { $0 + $1.totalAmount }
     }
-
-    private var prevMonthTotal: Int { prevMonthReceipts.reduce(0) { $0 + $1.totalAmount } }
 
     private var categoryTotals: [(Category, Int)] {
         Category.allCases.compactMap { cat in
@@ -38,8 +36,7 @@ struct DashboardView: View {
                         Image(systemName: "chevron.left")
                     }
                     Spacer()
-                    Text(currentMonth.monthYearString)
-                        .font(.headline)
+                    Text(currentMonth.monthYearString).font(.headline)
                     Spacer()
                     Button { changeMonth(by: 1) } label: {
                         Image(systemName: "chevron.right")
@@ -79,8 +76,7 @@ struct DashboardView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 16))
 
                             VStack(alignment: .leading, spacing: 12) {
-                                Text("カテゴリ別")
-                                    .font(.headline)
+                                Text("カテゴリ別").font(.headline)
                                 ForEach(categoryTotals, id: \.0) { cat, total in
                                     HStack {
                                         Image(systemName: cat.icon).foregroundStyle(cat.color)
@@ -118,9 +114,7 @@ struct DashboardView: View {
             }
             .navigationTitle("集計")
             .background(Color.receiptBackground)
-            .sheet(isPresented: $showSubscription) {
-                SubscriptionView()
-            }
+            .sheet(isPresented: $showSubscription) { SubscriptionView() }
         }
     }
 

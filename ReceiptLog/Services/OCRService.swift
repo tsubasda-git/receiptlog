@@ -7,7 +7,7 @@ enum OCRError: Error {
     case invalidImage
 }
 
-struct OCRResult {
+struct OCRResult: Equatable {
     var storeName: String
     var totalAmount: Int?
     var date: Date
@@ -46,7 +46,6 @@ actor OCRService {
         )
     }
 
-    // Store name blacklist: these lines are not store names
     private static let storeNameBlacklist: [String] = [
         "レシート", "領収書", "お買い上げ", "ありがとう", "またお越し",
         "合計", "税込", "税抜", "小計", "お会計", "おつり", "お釣り",
@@ -60,7 +59,6 @@ actor OCRService {
             guard trimmed.count >= 2 else { continue }
             let isBlacklisted = storeNameBlacklist.contains { trimmed.contains($0) }
             guard !isBlacklisted else { continue }
-            // Skip lines that look like dates or amounts
             let hasOnlyDigitsAndPunctuation = trimmed.allSatisfy { $0.isNumber || "/-:.,￥¥ ".contains($0) }
             guard !hasOnlyDigitsAndPunctuation else { continue }
             return trimmed
@@ -114,8 +112,8 @@ actor OCRService {
             }
         }
 
-        // 元号: 令和N年M月D日 / 平成N年M月D日
-        let japanesePattern = "(令和|平成|昭和)(\\d{1,2})年(\\d{1,2})月(\\d{1,2})日"
+        // 元号: 令和/平成/昭和 元年 or N年M月D日（「元」= 1年に対応）
+        let japanesePattern = "(令和|平成|昭和)(元|\\d{1,2})年(\\d{1,2})月(\\d{1,2})日"
         if let regex = try? NSRegularExpression(pattern: japanesePattern),
            let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
            let r1 = Range(match.range(at: 1), in: text),
@@ -123,7 +121,8 @@ actor OCRService {
            let r3 = Range(match.range(at: 3), in: text),
            let r4 = Range(match.range(at: 4), in: text) {
             let era = String(text[r1])
-            let n = Int(text[r2]) ?? 1
+            let nStr = String(text[r2])
+            let n = nStr == "元" ? 1 : (Int(nStr) ?? 1)
             let month = Int(text[r3]) ?? 1
             let day = Int(text[r4]) ?? 1
             let baseYear: Int
@@ -131,7 +130,7 @@ actor OCRService {
             case "令和": baseYear = 2018 + n
             case "平成": baseYear = 1988 + n
             case "昭和": baseYear = 1925 + n
-            default: baseYear = 2024
+            default:     baseYear = 2024
             }
             var components = DateComponents()
             components.year = baseYear

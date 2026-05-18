@@ -7,6 +7,8 @@ struct SubscriptionView: View {
     @State private var showPurchaseToast = false
     @State private var showRestoreToast = false
     @State private var restoreMessage = ""
+    @State private var showErrorAlert = false
+    @State private var errorMessage = ""
 
     var body: some View {
         NavigationStack {
@@ -33,9 +35,10 @@ struct SubscriptionView: View {
                             .font(.caption)
                             .multilineTextAlignment(.center)
                     } else if storeKit.products.isEmpty {
-                        Text("商品情報を読み込んでいます...")
+                        Text("商品情報を取得できませんでした。\nネットワーク接続を確認してください。")
                             .foregroundStyle(Color.receiptSubtext)
                             .font(.caption)
+                            .multilineTextAlignment(.center)
                     } else {
                         HStack(spacing: 12) {
                             ForEach(storeKit.products, id: \.id) { product in
@@ -45,10 +48,19 @@ struct SubscriptionView: View {
                                             try await storeKit.purchase(product)
                                             if storeKit.isPremium {
                                                 showPurchaseToast = true
-                                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { dismiss() }
+                                                Task {
+                                                    try? await Task.sleep(for: .milliseconds(1500))
+                                                    dismiss()
+                                                }
                                             }
+                                        } catch StoreKitError.purchaseFailed {
+                                            errorMessage = "購入できませんでした。もう一度お試しください。"
+                                            showErrorAlert = true
+                                        } catch StoreKitError.pending {
+                                            errorMessage = "購入の承認待ちです。保護者の方に確認してください（Ask to Buy）。"
+                                            showErrorAlert = true
                                         } catch {
-                                            // userCancelled は無視、その他は将来的にアラート表示
+                                            // userCancelled は無視
                                         }
                                     }
                                 }
@@ -80,10 +92,29 @@ struct SubscriptionView: View {
                     .font(.footnote)
                     .foregroundStyle(Color.receiptSubtext)
 
-                    Text("サブスクリプションは自動更新されます。キャンセルはApp Store設定から行えます。")
+                    // App Store審査要件：サブスクリプション免責事項
+                    VStack(spacing: 6) {
+                        Text("サブスクリプションについて")
+                            .font(.caption2.bold())
+                            .foregroundStyle(Color.receiptSubtext)
+                        Text("""
+                        • 購入の確認後、Apple IDアカウントに料金が請求されます
+                        • サブスクリプションは現在の期間終了の24時間前までにキャンセルしない限り、自動的に更新されます
+                        • 更新料金は期間終了の24時間以内に請求されます
+                        • 購入後はApp Store > Apple ID > サブスクリプションから管理・キャンセルできます
+                        """)
                         .font(.caption2)
                         .foregroundStyle(Color.receiptSubtext)
-                        .multilineTextAlignment(.center)
+                        .multilineTextAlignment(.leading)
+
+                        HStack(spacing: 16) {
+                            Link("プライバシーポリシー", destination: URL(string: "https://tsubasda-git.github.io/receiptlog/privacy.html")!)
+                            Link("利用規約", destination: URL(string: "https://tsubasda-git.github.io/receiptlog/terms.html")!)
+                        }
+                        .font(.caption2)
+                        .foregroundStyle(Color.receiptAccent)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .padding()
             }
@@ -98,6 +129,11 @@ struct SubscriptionView: View {
             .task { await storeKit.loadProducts() }
             .toast(isPresented: $showPurchaseToast, message: "🎉 プレミアムへようこそ！")
             .toast(isPresented: $showRestoreToast, message: restoreMessage)
+            .alert("購入エラー", isPresented: $showErrorAlert) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(errorMessage)
+            }
         }
     }
 }

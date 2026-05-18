@@ -13,6 +13,11 @@ struct ScanView: View {
     @Environment(\.modelContext) private var modelContext
     @AppStorage("scanSaveCount") private var scanSaveCount = 0
 
+    private var isProcessing: Bool {
+        if case .processing = viewModel.scanState { return true }
+        return false
+    }
+
     var body: some View {
         ZStack {
             CameraPreviewView(session: viewModel.session)
@@ -25,7 +30,7 @@ struct ScanView: View {
                     .strokeBorder(Color.receiptAccent, lineWidth: 3)
                     .frame(width: 300, height: 400)
                     .overlay {
-                        if case .processing = viewModel.scanState {
+                        if isProcessing {
                             ProgressView()
                                 .tint(.white)
                         }
@@ -39,19 +44,23 @@ struct ScanView: View {
                             .font(.title)
                             .foregroundStyle(.white)
                     }
+                    .accessibilityLabel("フォトライブラリから選択")
 
                     Button(action: { viewModel.capturePhoto() }) {
                         Circle()
-                            .fill(.white)
+                            .fill(isProcessing ? Color.white.opacity(0.5) : .white)
                             .frame(width: 70, height: 70)
                             .overlay(Circle().stroke(Color.receiptAccent, lineWidth: 3).padding(4))
                     }
+                    .disabled(isProcessing)
+                    .accessibilityLabel("撮影")
 
                     Button(action: { viewModel.toggleTorch() }) {
                         Image(systemName: viewModel.isTorchOn ? "bolt.fill" : "bolt.slash.fill")
                             .font(.title)
                             .foregroundStyle(.white)
                     }
+                    .accessibilityLabel(viewModel.isTorchOn ? "フラッシュをオフ" : "フラッシュをオン")
                 }
                 .padding(.bottom, 20)
 
@@ -69,6 +78,13 @@ struct ScanView: View {
         }
         .onDisappear {
             viewModel.stopCamera()
+            viewModel.showOCRConfirm = false
+        }
+        .onChange(of: viewModel.scanState) { _, state in
+            if case .error(let msg) = state {
+                toastMessage = msg
+                showToast = true
+            }
         }
         .onChange(of: selectedPhoto) { _, item in
             Task {
@@ -90,6 +106,7 @@ struct ScanView: View {
                         toastMessage = "✓ 保存しました"
                         showToast = true
                         viewModel.showOCRConfirm = false
+                        selectedPhoto = nil
                     }
                 )
             }
@@ -109,8 +126,17 @@ struct ScanView: View {
 
     private func checkCameraPermission() {
         let status = AVCaptureDevice.authorizationStatus(for: .video)
-        if status == .denied || status == .restricted {
+        switch status {
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .video) { granted in
+                if !granted {
+                    DispatchQueue.main.async { cameraPermissionDenied = true }
+                }
+            }
+        case .denied, .restricted:
             cameraPermissionDenied = true
+        default:
+            break
         }
     }
 

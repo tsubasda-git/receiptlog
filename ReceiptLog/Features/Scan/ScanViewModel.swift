@@ -2,7 +2,7 @@
 import UIKit
 import SwiftUI
 
-enum ScanState {
+enum ScanState: Equatable {
     case idle
     case scanning
     case processing
@@ -42,19 +42,28 @@ final class ScanViewModel: NSObject {
     }
 
     func capturePhoto() {
-        let settings = AVCapturePhotoSettings()
-        photoOutput.capturePhoto(with: settings, delegate: self)
+        let capturedOutput = photoOutput
+        sessionQueue.async { [weak self] in
+            guard let self else { return }
+            let settings = AVCapturePhotoSettings()
+            capturedOutput.capturePhoto(with: settings, delegate: self)
+        }
     }
 
     func toggleTorch() {
-        guard let device = AVCaptureDevice.default(for: .video), device.hasTorch else { return }
-        do {
-            try device.lockForConfiguration()
-            device.torchMode = device.torchMode == .on ? .off : .on
-            isTorchOn = device.torchMode == .on
-            device.unlockForConfiguration()
-        } catch {
-            print("Torch toggle failed: \(error)")
+        sessionQueue.async { [weak self] in
+            guard let device = AVCaptureDevice.default(for: .video), device.hasTorch else { return }
+            do {
+                try device.lockForConfiguration()
+                device.torchMode = device.torchMode == .on ? .off : .on
+                let isOn = device.torchMode == .on
+                device.unlockForConfiguration()
+                Task { @MainActor [weak self] in
+                    self?.isTorchOn = isOn
+                }
+            } catch {
+                print("Torch toggle failed: \(error)")
+            }
         }
     }
 

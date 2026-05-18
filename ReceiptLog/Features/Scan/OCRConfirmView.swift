@@ -8,7 +8,7 @@ struct OCRConfirmView: View {
     @State private var storeName: String
     @State private var totalAmount: String
     @State private var date: Date
-    @State private var selectedCategory: Category = .other
+    @State private var selectedCategory: Category
     @Environment(\.dismiss) private var dismiss
 
     init(ocrResult: OCRResult, capturedImage: UIImage?, onSave: @escaping (Receipt) -> Void) {
@@ -18,6 +18,12 @@ struct OCRConfirmView: View {
         _storeName   = State(initialValue: ocrResult.storeName)
         _totalAmount = State(initialValue: ocrResult.totalAmount.map { String($0) } ?? "")
         _date        = State(initialValue: ocrResult.date)
+
+        // 前回この店舗で選んだカテゴリを復元（なければ .other）
+        let categoryKey = "lastCategory_\(ocrResult.storeName)"
+        let saved = UserDefaults.standard.string(forKey: categoryKey)
+        let initialCategory = saved.flatMap { Category(rawValue: $0) } ?? .other
+        _selectedCategory = State(initialValue: initialCategory)
     }
 
     var body: some View {
@@ -78,6 +84,7 @@ struct OCRConfirmView: View {
                 }
                 .padding()
             }
+            .scrollDismissesKeyboard(.interactively)
             .background(Color.receiptBackground)
             .navigationTitle("確認・編集")
             .navigationBarTitleDisplayMode(.inline)
@@ -85,12 +92,25 @@ struct OCRConfirmView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("キャンセル") { dismiss() }
                 }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("完了") {
+                        UIApplication.shared.sendAction(
+                            #selector(UIResponder.resignFirstResponder),
+                            to: nil, from: nil, for: nil
+                        )
+                    }
+                }
             }
         }
     }
 
     private func save() {
         let amount = Int(totalAmount) ?? 0
+        let name = storeName.isEmpty ? "不明" : storeName
+        // 店舗ごとのカテゴリを記憶
+        UserDefaults.standard.set(selectedCategory.rawValue, forKey: "lastCategory_\(name)")
+
         var imageData: Data?
         if let image = capturedImage {
             let resized = image.preparingThumbnail(of: CGSize(width: 1024, height: 1024))
@@ -98,7 +118,7 @@ struct OCRConfirmView: View {
         }
         let receipt = Receipt(
             date: date,
-            storeName: storeName.isEmpty ? "不明" : storeName,
+            storeName: name,
             totalAmount: amount,
             category: selectedCategory.rawValue,
             imageData: imageData

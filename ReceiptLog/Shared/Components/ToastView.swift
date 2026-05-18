@@ -21,20 +21,21 @@ struct ToastModifier: ViewModifier {
     let duration: Double
 
     func body(content: Content) -> some View {
-        ZStack(alignment: .bottom) {
-            content
-            if isPresented {
-                ToastView(message: message)
-                    .padding(.bottom, 80)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .onAppear {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
-                            withAnimation { isPresented = false }
+        content
+            .safeAreaInset(edge: .bottom) {
+                if isPresented {
+                    ToastView(message: message)
+                        .padding(.bottom, 8)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .onAppear {
+                            Task {
+                                try? await Task.sleep(for: .milliseconds(Int(duration * 1000)))
+                                withAnimation { isPresented = false }
+                            }
                         }
-                    }
+                }
             }
-        }
-        .animation(.easeInOut, value: isPresented)
+            .animation(.easeInOut, value: isPresented)
     }
 }
 

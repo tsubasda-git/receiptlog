@@ -5,6 +5,7 @@ enum StoreKitError: Error {
     case productNotFound
     case purchaseFailed
     case networkError
+    case pending
 }
 
 @MainActor
@@ -65,7 +66,7 @@ final class StoreKitService {
         case .userCancelled:
             break
         case .pending:
-            break
+            throw StoreKitError.pending
         @unknown default:
             break
         }
