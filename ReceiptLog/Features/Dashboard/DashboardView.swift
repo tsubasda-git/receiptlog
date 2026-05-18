@@ -1,0 +1,97 @@
+import SwiftUI
+import SwiftData
+
+struct DashboardView: View {
+    @Query(sort: \Receipt.date, order: .reverse) private var allReceipts: [Receipt]
+    @State private var currentMonth: Date = Date()
+    @Environment(FeatureGate.self) private var featureGate
+    @State private var showSubscription = false
+
+    private var monthReceipts: [Receipt] {
+        allReceipts.filter { $0.date.isSameMonth(as: currentMonth) }
+    }
+
+    private var monthTotal: Int { monthReceipts.reduce(0) { $0 + $1.totalAmount } }
+
+    private var prevMonthReceipts: [Receipt] {
+        let prev = Calendar.current.date(byAdding: .month, value: -1, to: currentMonth)!
+        return allReceipts.filter { $0.date.isSameMonth(as: prev) }
+    }
+
+    private var prevMonthTotal: Int { prevMonthReceipts.reduce(0) { $0 + $1.totalAmount } }
+
+    private var categoryTotals: [(Category, Int)] {
+        Category.allCases.compactMap { cat in
+            let total = monthReceipts
+                .filter { $0.category == cat.rawValue }
+                .reduce(0) { $0 + $1.totalAmount }
+            return total > 0 ? (cat, total) : nil
+        }.sorted { $0.1 > $1.1 }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 20) {
+                    VStack(spacing: 8) {
+                        Text(currentMonth.monthYearString)
+                            .font(.subheadline)
+                            .foregroundStyle(Color.receiptSubtext)
+                        Text("¥\(monthTotal.formatted())")
+                            .font(.system(size: 40, weight: .bold))
+                            .foregroundStyle(Color.receiptText)
+                        let diff = monthTotal - prevMonthTotal
+                        if diff != 0 {
+                            Text("\(diff > 0 ? "▲" : "▼")¥\(abs(diff).formatted()) 先月比")
+                                .font(.caption)
+                                .foregroundStyle(diff > 0 ? .red : .green)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.receiptCard)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("カテゴリ別")
+                            .font(.headline)
+                        ForEach(categoryTotals, id: \.0) { cat, total in
+                            HStack {
+                                Image(systemName: cat.icon).foregroundStyle(cat.color)
+                                Text(cat.rawValue)
+                                Spacer()
+                                Text("¥\(total.formatted())").fontWeight(.medium)
+                            }
+                        }
+                    }
+                    .padding()
+                    .background(Color.receiptCard)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+
+                    if featureGate.isAvailable(.charts) {
+                        CategoryChartView(data: categoryTotals)
+                    } else {
+                        Button(action: { showSubscription = true }) {
+                            HStack {
+                                Image(systemName: "lock.fill")
+                                Text("グラフを見るにはプレミアムへ")
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                            }
+                            .padding()
+                            .background(Color.receiptAccent.opacity(0.1))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .foregroundStyle(Color.receiptAccent)
+                        }
+                    }
+                }
+                .padding()
+            }
+            .background(Color.receiptBackground)
+            .navigationTitle("今月のまとめ")
+            .sheet(isPresented: $showSubscription) {
+                SubscriptionView()
+            }
+        }
+    }
+}
