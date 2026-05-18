@@ -16,13 +16,17 @@ final class StoreKitService {
     var isLoading: Bool = false
     var loadError: String?
 
-    private var transactionListenerTask: Task<Void, Never>?
+    nonisolated(unsafe) private var transactionListenerTask: Task<Void, Never>?
 
     static let monthlyProductID = "com.kbytsubasa.ReceiptLog.premium.monthly"
     static let yearlyProductID  = "com.kbytsubasa.ReceiptLog.premium.yearly"
 
     init() {
         startTransactionListener()
+    }
+
+    deinit {
+        transactionListenerTask?.cancel()
     }
 
     private func startTransactionListener() {
@@ -86,7 +90,12 @@ final class StoreKitService {
                (transaction.productID == Self.monthlyProductID ||
                 transaction.productID == Self.yearlyProductID),
                transaction.revocationDate == nil {
-                hasPremium = true
+                // expirationDate が nil（非消耗型）または未来の場合のみ有効
+                if let expDate = transaction.expirationDate {
+                    if expDate > Date() { hasPremium = true }
+                } else {
+                    hasPremium = true
+                }
             }
         }
         isPremium = hasPremium

@@ -9,9 +9,11 @@ struct OCRConfirmView: View {
     @State private var totalAmount: String
     @State private var date: Date
     @State private var selectedCategory: Category
+    @State private var notes: String
+    @State private var showAmountError = false
     @Environment(\.dismiss) private var dismiss
 
-    init(ocrResult: OCRResult, capturedImage: UIImage?, onSave: @escaping (Receipt) -> Void) {
+    init(ocrResult: OCRResult, capturedImage: UIImage?, initialNotes: String = "", onSave: @escaping (Receipt) -> Void) {
         self.ocrResult = ocrResult
         self.capturedImage = capturedImage
         self.onSave = onSave
@@ -24,6 +26,7 @@ struct OCRConfirmView: View {
         let saved = UserDefaults.standard.string(forKey: categoryKey)
         let initialCategory = saved.flatMap { Category(rawValue: $0) } ?? .other
         _selectedCategory = State(initialValue: initialCategory)
+        _notes = State(initialValue: initialNotes)
     }
 
     var body: some View {
@@ -57,20 +60,26 @@ struct OCRConfirmView: View {
                         VStack(alignment: .leading) {
                             Text("🏷️ カテゴリ")
                                 .foregroundStyle(.secondary)
-                            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 8) {
+                            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 8) {
                                 ForEach(Category.allCases) { cat in
                                     Button(action: { selectedCategory = cat }) {
-                                        Text(cat.rawValue)
-                                            .font(.caption)
-                                            .padding(.vertical, 6)
-                                            .frame(maxWidth: .infinity)
-                                            .background(selectedCategory == cat ? Color.receiptAccent : Color.receiptBorder)
-                                            .foregroundStyle(selectedCategory == cat ? .white : Color.receiptText)
-                                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                                        VStack(spacing: 2) {
+                                            Image(systemName: cat.icon)
+                                                .font(.caption)
+                                            Text(cat.rawValue)
+                                                .font(.caption)
+                                        }
+                                        .padding(.vertical, 8)
+                                        .frame(maxWidth: .infinity)
+                                        .background(selectedCategory == cat ? Color.receiptAccent : Color.receiptBorder)
+                                        .foregroundStyle(selectedCategory == cat ? .white : Color.receiptText)
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
                                     }
                                 }
                             }
                         }
+
+                        FormField(title: "📝 メモ", placeholder: "メモ（任意）", text: $notes)
                     }
                     .padding()
                     .background(Color.receiptCard)
@@ -85,6 +94,11 @@ struct OCRConfirmView: View {
                 .padding()
             }
             .scrollDismissesKeyboard(.interactively)
+            .alert("金額を入力してください", isPresented: $showAmountError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("0円より大きい金額を入力してください")
+            }
             .background(Color.receiptBackground)
             .navigationTitle("確認・編集")
             .navigationBarTitleDisplayMode(.inline)
@@ -106,7 +120,10 @@ struct OCRConfirmView: View {
     }
 
     private func save() {
-        let amount = Int(totalAmount) ?? 0
+        guard let amount = Int(totalAmount), amount > 0 else {
+            showAmountError = true
+            return
+        }
         let name = storeName.isEmpty ? "不明" : storeName
         // 店舗ごとのカテゴリを記憶
         UserDefaults.standard.set(selectedCategory.rawValue, forKey: "lastCategory_\(name)")
@@ -121,7 +138,8 @@ struct OCRConfirmView: View {
             storeName: name,
             totalAmount: amount,
             category: selectedCategory.rawValue,
-            imageData: imageData
+            imageData: imageData,
+            notes: notes
         )
         onSave(receipt)
     }

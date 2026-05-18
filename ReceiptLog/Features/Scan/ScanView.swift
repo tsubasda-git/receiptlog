@@ -30,9 +30,15 @@ struct ScanView: View {
                     .strokeBorder(Color.receiptAccent, lineWidth: 3)
                     .frame(width: 300, height: 400)
                     .overlay {
-                        if isProcessing {
+                        if case .processing = viewModel.scanState {
                             ProgressView()
                                 .tint(.white)
+                        } else {
+                            Text("レシートを枠内に収めて\n撮影ボタンを押してください")
+                                .font(.caption)
+                                .foregroundStyle(.white)
+                                .multilineTextAlignment(.center)
+                                .padding(8)
                         }
                     }
 
@@ -68,6 +74,10 @@ struct ScanView: View {
                     viewModel.startManualEntry()
                 }
                 .foregroundStyle(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(Color.black.opacity(0.3))
+                .clipShape(Capsule())
                 .padding(.bottom, 30)
                 .accessibilityIdentifier("manual-entry-button")
             }
@@ -78,7 +88,6 @@ struct ScanView: View {
         }
         .onDisappear {
             viewModel.stopCamera()
-            viewModel.showOCRConfirm = false
         }
         .onChange(of: viewModel.scanState) { _, state in
             if case .error(let msg) = state {

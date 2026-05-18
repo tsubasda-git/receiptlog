@@ -25,6 +25,7 @@ struct ToastModifier: ViewModifier {
             .safeAreaInset(edge: .bottom) {
                 if isPresented {
                     ToastView(message: message)
+                        .id(message)   // メッセージが変わったら再生成してonAppearを再発火
                         .padding(.bottom, 8)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                         .onAppear {

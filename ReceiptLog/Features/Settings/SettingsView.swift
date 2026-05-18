@@ -4,10 +4,12 @@ import SwiftData
 struct SettingsView: View {
     @Environment(StoreKitService.self) private var storeKit
     @Environment(\.modelContext) private var modelContext
+    @Query(sort: \Receipt.date, order: .reverse) private var allReceipts: [Receipt]
     @State private var showSubscription = false
     @State private var showDeleteAlert = false
     @State private var showRestoreToast = false
     @State private var restoreMessage = ""
+    @State private var deleteError = false
 
     var body: some View {
         NavigationStack {
@@ -26,8 +28,13 @@ struct SettingsView: View {
 
                 Section("データ") {
                     if storeKit.isPremium {
-                        Label("CSV書き出し", systemImage: "doc.text")
-                            .foregroundStyle(Color.receiptText)
+                        ShareLink(
+                            item: generateCSV(),
+                            preview: SharePreview("ReceiptLog.csv", icon: Image(systemName: "doc.text"))
+                        ) {
+                            Label("CSV書き出し", systemImage: "doc.text")
+                                .foregroundStyle(Color.receiptText)
+                        }
                     } else {
                         Button(action: { showSubscription = true }) {
                             HStack {
@@ -73,13 +80,38 @@ struct SettingsView: View {
             .sheet(isPresented: $showSubscription) { SubscriptionView() }
             .alert("全データを削除しますか？", isPresented: $showDeleteAlert) {
                 Button("削除", role: .destructive) {
-                    try? modelContext.delete(model: Receipt.self)
+                    do {
+                        try modelContext.delete(model: Receipt.self)
+                    } catch {
+                        deleteError = true
+                    }
                 }
                 Button("キャンセル", role: .cancel) {}
             } message: {
                 Text("この操作は元に戻せません")
             }
+            .alert("削除エラー", isPresented: $deleteError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("データの削除に失敗しました")
+            }
             .toast(isPresented: $showRestoreToast, message: restoreMessage)
         }
+    }
+
+    private func generateCSV() -> String {
+        var csv = "日付,店名,金額,カテゴリ,メモ\n"
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy/MM/dd"
+        for receipt in allReceipts {
+            let date = dateFormatter.string(from: receipt.date)
+            let store = receipt.storeName.replacingOccurrences(of: ",", with: "、")
+            let category = receipt.category
+            let notes = receipt.notes
+                .replacingOccurrences(of: ",", with: "、")
+                .replacingOccurrences(of: "\n", with: " ")
+            csv += "\(date),\(store),\(receipt.totalAmount),\(category),\(notes)\n"
+        }
+        return csv
     }
 }

@@ -1,18 +1,26 @@
 import Foundation
 
 extension Date {
+    private static let monthYearFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "ja_JP")
+        f.dateFormat = "yyyy年M月"
+        return f
+    }()
+
+    private static let shortDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "ja_JP")
+        f.dateFormat = "M月d日(E)"
+        return f
+    }()
+
     var monthYearString: String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ja_JP")
-        formatter.dateFormat = "yyyy年M月"
-        return formatter.string(from: self)
+        Date.monthYearFormatter.string(from: self)
     }
 
     var shortDateString: String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ja_JP")
-        formatter.dateFormat = "M月d日(E)"
-        return formatter.string(from: self)
+        Date.shortDateFormatter.string(from: self)
     }
 
     func isSameMonth(as other: Date) -> Bool {

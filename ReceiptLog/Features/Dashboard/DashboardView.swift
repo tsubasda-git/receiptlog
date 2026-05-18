@@ -27,6 +27,15 @@ struct DashboardView: View {
         }.sorted { $0.1 > $1.1 }
     }
 
+    private var monthlyTotals: [(String, Int)] {
+        (0..<6).compactMap { offset -> (String, Int)? in
+            guard let month = Calendar.current.date(byAdding: .month, value: -offset, to: Date()) else { return nil }
+            let total = allReceipts.filter { $0.date.isSameMonth(as: month) }.reduce(0) { $0 + $1.totalAmount }
+            let label = Calendar.current.component(.month, from: month)
+            return ("\(label)月", total)
+        }.reversed()
+    }
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -36,7 +45,12 @@ struct DashboardView: View {
                         Image(systemName: "chevron.left")
                     }
                     Spacer()
-                    Text(currentMonth.monthYearString).font(.headline)
+                    Button(action: { currentMonth = Date() }) {
+                        Text(currentMonth.monthYearString)
+                            .font(.headline)
+                            .foregroundStyle(Color.receiptText)
+                    }
+                    .disabled(Calendar.current.isDate(currentMonth, equalTo: Date(), toGranularity: .month))
                     Spacer()
                     Button { changeMonth(by: 1) } label: {
                         Image(systemName: "chevron.right")
@@ -92,6 +106,17 @@ struct DashboardView: View {
 
                             if featureGate.isAvailable(.charts) {
                                 CategoryChartView(data: categoryTotals)
+
+                                // 過去6か月棒グラフ
+                                if !monthlyTotals.isEmpty && monthlyTotals.contains(where: { $0.1 > 0 }) {
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        Text("過去6か月の推移").font(.headline)
+                                        MonthlyBarChartView(data: monthlyTotals)
+                                    }
+                                    .padding()
+                                    .background(Color.receiptCard)
+                                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                                }
                             } else {
                                 Button(action: { showSubscription = true }) {
                                     HStack {

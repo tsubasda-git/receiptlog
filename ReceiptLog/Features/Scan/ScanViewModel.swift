@@ -27,7 +27,10 @@ final class ScanViewModel: NSObject {
     func setupCamera() {
         guard session.inputs.isEmpty else { return }
         guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
-              let input = try? AVCaptureDeviceInput(device: device) else { return }
+              let input = try? AVCaptureDeviceInput(device: device) else {
+            scanState = .error("カメラが利用できません")
+            return
+        }
         session.beginConfiguration()
         session.addInput(input)
         session.addOutput(photoOutput)
@@ -42,6 +45,7 @@ final class ScanViewModel: NSObject {
     }
 
     func capturePhoto() {
+        guard case .idle = scanState else { return }
         let capturedOutput = photoOutput
         sessionQueue.async { [weak self] in
             guard let self else { return }
